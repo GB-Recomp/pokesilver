@@ -1,2 +1,72 @@
 # pokesilver
-Pokemon Silver Recompilation using gb-recompiled
+
+Static recompilation of Pokemon Silver into portable C, built with
+[GB-Recomp/gb-recompiled](https://github.com/GB-Recomp/gb-recompiled).
+
+This repo ships pre-generated C sources so it builds out of the box —
+you don't need an asm toolchain or the pret/pokesilver decompilation just
+to play.
+
+## Build
+
+You need a C/C++ compiler, CMake 3.16+, SDL2, libcurl, and OpenGL ES 2.
+CMake fetches `gb-recompiled` automatically (no manual setup).
+
+```sh
+mkdir build && cd build
+cmake ..
+cmake --build . -j$(nproc)
+```
+
+This produces a `pokesilver` executable.
+
+## Run
+
+The runtime needs a ROM the first time it boots (it extracts assets into
+`assets/pokesilver/` and then runs from there on subsequent launches).
+
+Drop a Pokemon Silver ROM at `roms/pokesilver.gbc` next to the executable:
+
+```sh
+mkdir -p roms
+cp /path/to/pokesilver.gb roms/pokesilver.gbc
+./pokesilver
+```
+
+The launcher auto-starts when only one game is registered, so you go
+straight into Red. Battery RAM saves to `pokesilver.sav` next to the
+binary. Press Esc in-game for the settings menu (palette, audio,
+savestates, **Restart Game**, etc.).
+
+## Regenerating the C sources
+
+If you want to rebuild the C from scratch — bump `gb-recompiled`, pick
+up a recompiler change, or tweak the analyzer — run:
+
+```sh
+tools/regen.sh /path/to/pret/pokesilver /path/to/gb-recompiled
+```
+
+That re-builds the ROM via the pret toolchain (requires `rgbds`), then
+invokes `gbrecomp` with the same flags the compilation uses, and copies
+the freshly generated `pokesilver_*.c` files into this repo. Verify with
+`cmake --build .` and commit.
+
+## In a compilation
+
+If you're building a multi-cart compilation that wants to include Red,
+add this repo via `FetchContent` in your top-level CMakeLists:
+
+```cmake
+FetchContent_Declare(pokesilver
+    GIT_REPOSITORY https://github.com/GB-Recomp/pokesilver.git
+    GIT_TAG main
+)
+FetchContent_MakeAvailable(pokesilver)
+# Now link the `pokesilver_cart` target into your launcher executable
+# and call pokesilver_main(argc, argv) from your launcher's g_games[].
+```
+
+The standalone `pokesilver` executable is only built when this repo is the
+top-level project, so consuming it as a subdir doesn't produce a
+conflicting executable target.
