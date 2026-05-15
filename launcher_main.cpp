@@ -4,6 +4,7 @@
 #define SDL_MAIN_HANDLED
 extern "C" {
 #include "pokesilver.h"
+#include "gb_sha256.h"
 }
 
 #include <SDL.h>
@@ -27,14 +28,23 @@ typedef struct {
     const char* title;
     const char* rom_path;
     GBLauncherMainFn main_fn;
+    /* Lowercase 64-char SHA-256 of the ROM revision the static
+     * recompilation was built against. NULL skips the check. */
+    const char* expected_sha256;
 } GBLauncherGame;
 
 static int launch_pokesilver(int argc, char* argv[]) {
     return pokesilver_main(argc, argv);
 }
 
+/* SHA-256 of the canonical pokesilver.gbc the static
+ * recompilation was built against. */
+static const char POKESILVER_EXPECTED_SHA256[] =
+    "72b190859a59623cbef6c49d601f8de52c1d2331b4f08a8d2acc17274fc19a8c";
+
 static GBLauncherGame g_games[] = {
-    {"pokesilver", "Pokemon Silver", "roms/pokesilver.gbc", launch_pokesilver},
+    {"pokesilver", "Pokemon Silver", "roms/pokesilver.gbc", launch_pokesilver,
+     POKESILVER_EXPECTED_SHA256},
 };
 
 static const char* g_launcher_name = "pokesilver";
@@ -429,6 +439,14 @@ int main(int argc, char* argv[]) {
         }
 
         fprintf(stderr, "[LAUNCH] Starting %s [%s]\n", selected->title, selected->id);
+        /* Hash-verify the ROM matches the build the cart was
+         * compiled against. Mismatch is a warning, not fatal --
+         * the asset loader still gates on its own checks. */
+        if (selected->expected_sha256 && selected->rom_path) {
+            gb_sha256_verify_file(selected->rom_path,
+                                  selected->expected_sha256,
+                                  selected->rom_path);
+        }
         /* In single-game mode there's no launcher to return to, so hide
          * the in-game "Return to Launcher" Esc-menu entry (the menu shows
          * "Restart Game" in its place — handled below by the consume call). */
